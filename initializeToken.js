@@ -12,9 +12,10 @@ mongoose
   .then(() => {
     console.log("MongoDB connected");
     const token = new Token({
-      accessToken: "",
-      refreshToken: "4134fad775a822b698061257d6bf7cd75f9be7a5",
-      expiresAt: new Date(),
+      user: "defaultUser",
+      accessToken: "", // Initially empty, will be refreshed
+      refreshToken: "4c218f6b17035895f7a57c381cd7554e3f249646", // Replace with actual refresh token
+      expiresAt: new Date(), // Set to current date, will be refreshed
     });
     return token.save();
   })

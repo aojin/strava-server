@@ -12,19 +12,17 @@ app.use(cors()); // Enable CORS
 app.use(express.json());
 
 mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.log(err));
+  .catch((err) => console.log("MongoDB connection error:", err));
 
+// Function to get a valid access token
 const getToken = async () => {
   try {
-    const token = await Token.findOne();
+    let token = await Token.findOne({ user: "defaultUser" });
     if (!token) throw new Error("No token found");
 
-    if (new Date() > token.expiresAt) {
+    if (new Date() > token.expiresAt || !token.accessToken) {
       const response = await axios.post("https://www.strava.com/oauth/token", {
         client_id: process.env.STRAVA_CLIENT_ID,
         client_secret: process.env.STRAVA_CLIENT_SECRET,
@@ -32,10 +30,15 @@ const getToken = async () => {
         grant_type: "refresh_token",
       });
 
-      token.accessToken = response.data.access_token;
-      token.refreshToken = response.data.refresh_token;
-      token.expiresAt = new Date(Date.now() + response.data.expires_in * 1000);
-      await token.save();
+      token = await Token.findOneAndUpdate(
+        { user: "defaultUser" },
+        {
+          accessToken: response.data.access_token,
+          refreshToken: response.data.refresh_token,
+          expiresAt: new Date(Date.now() + response.data.expires_in * 1000),
+        },
+        { new: true }
+      );
     }
 
     return token.accessToken;
@@ -47,6 +50,20 @@ const getToken = async () => {
     throw new Error("Failed to refresh Strava token");
   }
 };
+
+// Endpoint to get a valid access token
+app.get("/get-access-token", async (req, res) => {
+  try {
+    const accessToken = await getToken();
+    res.json({ access_token: accessToken });
+  } catch (err) {
+    console.error(
+      "Error fetching access token:",
+      err.response ? err.response.data : err.message
+    );
+    res.status(500).json({ error: "Failed to fetch access token" });
+  }
+});
 
 app.get("/", (req, res) => {
   res.send("Server is running");
