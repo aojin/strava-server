@@ -53,6 +53,8 @@ app.get("/", (req, res) => {
 });
 
 app.get("/strava-data", async (req, res) => {
+  const { page = 1, per_page = 30 } = req.query; // Default to page 1 and 30 items per page
+
   try {
     const accessToken = await getToken();
     const response = await axios.get(
@@ -60,6 +62,10 @@ app.get("/strava-data", async (req, res) => {
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+        },
+        params: {
+          page,
+          per_page,
         },
       }
     );
