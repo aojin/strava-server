@@ -3,7 +3,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const axios = require("axios");
-const axiosRetry = require("axios-retry");
+const axiosRetry = require("axios-retry").default;
 const getToken = require("./getToken"); // Firestore + refresh logic
 const { saveToken } = require("./models/tokenStore");
 
