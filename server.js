@@ -13,6 +13,7 @@ dotenv.config();
 [
   "STRAVA_CLIENT_ID",
   "STRAVA_CLIENT_SECRET",
+  "STRAVA_REDIRECT_URI",
   "FIREBASE_PROJECT_ID",
   "FIREBASE_CLIENT_EMAIL",
   "FIREBASE_PRIVATE_KEY",
@@ -27,9 +28,10 @@ axiosRetry(axios, {
   retries: 2,
   retryDelay: axiosRetry.exponentialDelay,
   retryCondition: (error) => {
-    // retry on network errors & 5xx only
-    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-      error.response?.status >= 500;
+    return (
+      axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+      error.response?.status >= 500
+    );
   },
 });
 
@@ -50,7 +52,6 @@ app.get("/get-access-token", async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching access token:", err.message);
 
-    // Detect invalid refresh token
     if (err.response?.status === 400) {
       return res.status(400).json({
         error: "Invalid refresh token. Please re-run /exchange_token.",
@@ -89,7 +90,7 @@ app.get("/strava-data", async (req, res) => {
   }
 });
 
-// ─── One-Time OAuth Exchange (optional) ────────
+// ─── One-Time OAuth Exchange ───────────────────
 app.get("/exchange_token", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.status(400).json({ error: "Missing authorization code" });
@@ -100,11 +101,11 @@ app.get("/exchange_token", async (req, res) => {
       client_secret: process.env.STRAVA_CLIENT_SECRET,
       code,
       grant_type: "authorization_code",
+      redirect_uri: process.env.STRAVA_REDIRECT_URI, // 🔑 required by Strava
     });
 
     const { access_token, refresh_token, expires_at } = response.data;
 
-    // Save to Firestore so auto-refresh works forever
     await saveToken({
       accessToken: access_token,
       refreshToken: refresh_token,
@@ -116,8 +117,15 @@ app.get("/exchange_token", async (req, res) => {
       data: response.data,
     });
   } catch (err) {
-    console.error("❌ Error exchanging token:", err.response?.data || err.message);
-    res.status(500).json({ error: "Failed to exchange token" });
+    console.error("❌ Error exchanging token:");
+    console.error("Status:", err.response?.status);
+    console.error("Data:", err.response?.data);
+    console.error("Message:", err.message);
+
+    res.status(500).json({
+      error: "Failed to exchange token",
+      details: err.response?.data || err.message,
+    });
   }
 });
 
