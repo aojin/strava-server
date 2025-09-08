@@ -1,26 +1,21 @@
-const mongoose = require("mongoose");
+// initializeToken.js
 const dotenv = require("dotenv");
-const Token = require("./models/tokenModel");
+const { saveToken } = require("./models/tokenStore");
 
 dotenv.config();
 
-mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => {
-    console.log("MongoDB connected");
-    const token = new Token({
-      user: "defaultUser",
-      accessToken: "", // Initially empty, will be refreshed
-      refreshToken: "4c218f6b17035895f7a57c381cd7554e3f249646", // Replace with actual refresh token
-      expiresAt: new Date(), // Set to current date, will be refreshed
+(async () => {
+  try {
+    await saveToken({
+      accessToken: "", // will be refreshed on first request
+      refreshToken: process.env.STRAVA_REFRESH_TOKEN, // from initial OAuth exchange
+      expiresAt: new Date(0).toISOString(), // expired → forces immediate refresh
     });
-    return token.save();
-  })
-  .then(() => {
-    console.log("Token saved");
-    mongoose.connection.close();
-  })
-  .catch((err) => console.log(err));
+
+    console.log("✅ Initial refresh token saved to Firestore.");
+    process.exit(0); // exit script cleanly
+  } catch (err) {
+    console.error("❌ Failed to save refresh token:", err.message);
+    process.exit(1);
+  }
+})();

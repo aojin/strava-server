@@ -1,1 +1,15 @@
+# dependencies
+/node_modules
+
+# vercel
 .vercel
+
+# env
+.env
+.env.*
+firebase_service_account.json
+
+# misc
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
