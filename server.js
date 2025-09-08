@@ -3,10 +3,35 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const axios = require("axios");
+const axiosRetry = require("axios-retry");
 const getToken = require("./getToken"); // Firestore + refresh logic
 const { saveToken } = require("./models/tokenStore");
 
 dotenv.config();
+
+// ─── Validate Required ENV Vars ────────────────
+[
+  "STRAVA_CLIENT_ID",
+  "STRAVA_CLIENT_SECRET",
+  "FIREBASE_PROJECT_ID",
+  "FIREBASE_CLIENT_EMAIL",
+  "FIREBASE_PRIVATE_KEY",
+].forEach((key) => {
+  if (!process.env[key]) {
+    throw new Error(`❌ Missing required env var: ${key}`);
+  }
+});
+
+// ─── Axios Retry (transient errors) ────────────
+axiosRetry(axios, {
+  retries: 2,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => {
+    // retry on network errors & 5xx only
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+      error.response?.status >= 500;
+  },
+});
 
 const app = express();
 app.use(cors());
@@ -24,6 +49,15 @@ app.get("/get-access-token", async (req, res) => {
     res.json({ access_token: accessToken });
   } catch (err) {
     console.error("❌ Error fetching access token:", err.message);
+
+    // Detect invalid refresh token
+    if (err.response?.status === 400) {
+      return res.status(400).json({
+        error: "Invalid refresh token. Please re-run /exchange_token.",
+        details: err.response.data,
+      });
+    }
+
     res.status(500).json({ error: "Failed to fetch access token" });
   }
 });

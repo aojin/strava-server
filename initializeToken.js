@@ -1,8 +1,7 @@
 // initializeToken.js
-const dotenv = require("dotenv");
-const { saveToken } = require("./models/tokenStore");
+require("dotenv").config();   // ✅ load env FIRST
 
-dotenv.config();
+const { saveToken } = require("./models/tokenStore");
 
 (async () => {
   try {
@@ -13,7 +12,7 @@ dotenv.config();
     });
 
     console.log("✅ Initial refresh token saved to Firestore.");
-    process.exit(0); // exit script cleanly
+    process.exit(0);
   } catch (err) {
     console.error("❌ Failed to save refresh token:", err.message);
     process.exit(1);
