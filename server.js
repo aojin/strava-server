@@ -4,7 +4,6 @@ require("./config"); // ✅ ensures .env is loaded before anything else
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-const axiosRetry = require("axios-retry");
 const getToken = require("./getToken"); // Firestore + refresh logic
 const { saveToken } = require("./models/tokenStore");
 
@@ -20,15 +19,6 @@ const { saveToken } = require("./models/tokenStore");
   if (!process.env[key]) {
     throw new Error(`❌ Missing required env var: ${key}`);
   }
-});
-
-// ─── Axios Retry (transient errors) ────────────
-axiosRetry(axios, {
-  retries: 2,
-  retryDelay: axiosRetry.exponentialDelay,
-  retryCondition: (error) =>
-    axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-    error.response?.status >= 500,
 });
 
 const app = express();
