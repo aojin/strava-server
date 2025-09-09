@@ -3,44 +3,26 @@ const db = require("../firebase");
 
 /**
  * Get a token document from Firestore
- * @param {string} userId - Document ID (default "defaultUser")
  */
 async function getTokenDoc(userId = "defaultUser") {
-  try {
-    const docRef = db.collection("tokens").doc(userId);
-    const doc = await docRef.get();
-
-    if (!doc.exists) return null;
-    return doc.data();
-  } catch (err) {
-    console.error("❌ Failed to fetch token from Firestore:", err.message);
-    throw err;
-  }
+  const docRef = db.collection("tokens").doc(userId);
+  const doc = await docRef.get();
+  return doc.exists ? doc.data() : null;
 }
 
 /**
  * Save or update a token in Firestore
- * @param {object} data - Token data
- * @param {string} userId - Document ID (default "defaultUser")
  */
 async function saveToken(data, userId = "defaultUser") {
-  try {
-    const docRef = db.collection("tokens").doc(userId);
+  const docRef = db.collection("tokens").doc(userId);
 
-    // Normalize expiresAt: store as Firestore Timestamp
-    const tokenData = {
-      ...data,
-      expiresAt: data.expiresAt
-        ? new Date(data.expiresAt)
-        : new Date(0), // fallback if missing
-    };
+  const tokenData = {
+    ...data,
+    expiresAt: data.expiresAt ? new Date(data.expiresAt) : new Date(0),
+  };
 
-    await docRef.set(tokenData, { merge: true });
-    return tokenData;
-  } catch (err) {
-    console.error("❌ Failed to save token to Firestore:", err.message);
-    throw err;
-  }
+  await docRef.set(tokenData, { merge: true });
+  return tokenData;
 }
 
 module.exports = { getTokenDoc, saveToken };

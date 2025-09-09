@@ -1,13 +1,12 @@
 // server.js
+require("./config"); // ✅ ensures .env is loaded before anything else
+
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
 const axios = require("axios");
-const axiosRetry = require("axios-retry").default;
+const axiosRetry = require("axios-retry");
 const getToken = require("./getToken"); // Firestore + refresh logic
 const { saveToken } = require("./models/tokenStore");
-
-dotenv.config();
 
 // ─── Validate Required ENV Vars ────────────────
 [
@@ -27,12 +26,9 @@ dotenv.config();
 axiosRetry(axios, {
   retries: 2,
   retryDelay: axiosRetry.exponentialDelay,
-  retryCondition: (error) => {
-    return (
-      axiosRetry.isNetworkOrIdempotentRequestError(error) ||
-      error.response?.status >= 500
-    );
-  },
+  retryCondition: (error) =>
+    axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+    error.response?.status >= 500,
 });
 
 const app = express();
@@ -101,7 +97,7 @@ app.get("/exchange_token", async (req, res) => {
       client_secret: process.env.STRAVA_CLIENT_SECRET,
       code,
       grant_type: "authorization_code",
-      redirect_uri: process.env.STRAVA_REDIRECT_URI, // 🔑 required by Strava
+      redirect_uri: process.env.STRAVA_REDIRECT_URI,
     });
 
     const { access_token, refresh_token, expires_at } = response.data;
@@ -130,5 +126,4 @@ app.get("/exchange_token", async (req, res) => {
 });
 
 // 🚨 Do NOT call app.listen() on Vercel!
-// Instead export the app so Vercel can mount it.
 module.exports = app;
