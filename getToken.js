@@ -1,10 +1,21 @@
-// getToken.js
 const axios = require("axios");
 const { getTokenDoc, saveToken } = require("./models/tokenStore");
 
+// Helper to normalize Firestore Timestamp | Date | ISO string -> ms
+function toMs(expiresAt) {
+  if (!expiresAt) return 0;
+  // Firestore Timestamp has toDate()
+  if (typeof expiresAt.toDate === "function") {
+    return expiresAt.toDate().getTime();
+  }
+  const d = new Date(expiresAt);
+  const t = d.getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
 /**
  * Fetches a valid Strava access token.
- * Refreshes from Strava if expired or missing.
+ * Refreshes from Strava if expired or near-expired.
  */
 async function getToken() {
   let token = await getTokenDoc();
@@ -13,11 +24,15 @@ async function getToken() {
     throw new Error("No token found in Firestore. Run /exchange_token first.");
   }
 
-  const isExpired =
-    !token.accessToken || Date.now() >= new Date(token.expiresAt).getTime();
+  const now = Date.now();
+  const expMs = toMs(token.expiresAt);
 
-  if (isExpired) {
-    console.log("⚠️ Access token expired or missing. Refreshing from Strava...");
+  // Refresh if missing, expired, or expiring within 2 minutes
+  const needsRefresh =
+    !token.accessToken || !expMs || now >= expMs - 2 * 60 * 1000;
+
+  if (needsRefresh) {
+    console.log("⚠️ Access token missing/expired/near-expiry. Refreshing from Strava...");
 
     const response = await axios.post("https://www.strava.com/oauth/token", {
       client_id: process.env.STRAVA_CLIENT_ID,
@@ -26,14 +41,17 @@ async function getToken() {
       grant_type: "refresh_token",
     });
 
-    const newExpiry = new Date(
-      Date.now() + response.data.expires_in * 1000
-    ).toISOString();
+    // Strava rotates refresh tokens — always save the new one
+    const { access_token, refresh_token, expires_in, expires_at } = response.data;
+    const newExpiryIso =
+      expires_at
+        ? new Date(expires_at * 1000).toISOString()
+        : new Date(now + expires_in * 1000).toISOString();
 
     token = {
-      accessToken: response.data.access_token,
-      refreshToken: response.data.refresh_token,
-      expiresAt: newExpiry,
+      accessToken: access_token,
+      refreshToken: refresh_token,
+      expiresAt: newExpiryIso,
     };
 
     await saveToken(token);
